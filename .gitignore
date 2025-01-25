@@ -1,0 +1,4 @@
+zig-out/
+.zig-cache/
+.ropeproject/
+.DS_Store

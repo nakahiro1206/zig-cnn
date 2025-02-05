@@ -115,6 +115,22 @@ pub fn NDArray(comptime T: type, comptime N: usize) type {
             };
         }
 
+        pub fn duplicate(shape: [N]usize, source: NDArray(T, N), allocator: std.mem.Allocator) !Self {
+            inline for (shape, source.shape) |s, o| {
+                if (s != o) {
+                    return Error.UnequalShape;
+                }
+            }
+            const items_copy = try allocator.alloc(T, source.items.len);
+            @memcpy(items_copy, source.items);
+
+            return Self{
+                .items = items_copy,
+                .shape = shape,
+                .allocator = allocator,
+            };
+        }
+
         pub fn deinit(self: *Self) void {
             self.allocator.free(self.items);
         }
@@ -131,6 +147,11 @@ pub fn NDArray(comptime T: type, comptime N: usize) type {
 
         pub fn setAt(self: *Self, index: [N]usize, val: T) void {
             const idx = self.getLinearIndex(index);
+            self.items[idx] = val;
+        }
+
+        pub fn setAtConst(self: *const Self, index: [N]usize, val: T) void {
+            const idx = self.getLinearIndexConst(index);
             self.items[idx] = val;
         }
 
@@ -244,7 +265,80 @@ pub fn NDArray(comptime T: type, comptime N: usize) type {
             }
             return false;
         }
+
+        pub fn isValidIndex(self: *const Self, index: [N]usize) bool {
+            for (0..N) |dim| {
+                if (index[dim] < 0) {
+                    return false;
+                }
+                const size = self.shape[dim];
+                if (index[dim] >= size) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        pub fn addScalarMut(self: *Self, val: T) void {
+            self.applyScalarFnMut(val, NumericFns(T).addMut);
+        }
+
+        pub fn addMatrixMut(self: *Self, other: NDArray(T, N)) !void {
+            try self.applyFnMut(other, NumericFns(T).addMut);
+        }
+
+        pub fn multiplyScalarMut(self: *Self, val: T) void {
+            self.applyScalarFnMut(val, NumericFns(T).multiplyMut);
+        }
+
+        pub fn setData(self: *Self, val: []T) !void {
+            if (val.len != self.items.len) {
+                return Error.UnequalBufferSize;
+            }
+            @memcpy(self.items, val);
+        }
     };
+}
+
+//test setAtConst
+fn testSetAtConst(arr: NDArray(f64, 1)) void {
+    arr.setAtConst(.{0}, 1.0);
+}
+
+test "my impl test" {
+    var arr = try NDArray(f64, 2).fromCopiedSlice(.{ 2, 2 }, &.{ 1.0, 2.0, 3.0, 4.0 }, std.testing.allocator);
+    defer arr.deinit();
+    arr.addScalarMut(1.0);
+    try std.testing.expectEqual(arr.at(.{ 0, 0 }), 2.0);
+
+    var arr2 = try NDArray(f64, 2).fromCopiedSlice(.{ 2, 2 }, &.{ 4.0, 3.0, 2.0, 1.0 }, std.testing.allocator);
+    defer arr2.deinit();
+    try arr.addMatrixMut(arr2);
+    try std.testing.expectEqual(arr.at(.{ 0, 0 }), 6.0);
+
+    var arr3 = try NDArray(f64, 2).duplicate(.{ 2, 2 }, arr, std.testing.allocator);
+    defer arr3.deinit();
+    try std.testing.expectEqual(arr3.at(.{ 1, 1 }), 6.0);
+
+    // reshape
+    var arr4 = try NDArray(f64, 1).fromCopiedSlice(.{4}, arr3.items, std.testing.allocator);
+    defer arr4.deinit();
+    try std.testing.expectEqual(arr4.at(.{1}), 6.0);
+
+    var arr5 = try NDArray(f64, 1).initWithValue(.{4}, -1.0, std.testing.allocator);
+    defer arr5.deinit();
+    testSetAtConst(arr5);
+    try std.testing.expectEqual(arr5.at(.{0}), 1.0);
+
+    var arr6 = try NDArray(f64, 2).init(.{ 2, 2 }, std.testing.allocator);
+    defer arr6.deinit();
+    var val = try std.testing.allocator.alloc(f64, 4);
+    defer std.testing.allocator.free(val);
+    val[0] = 1.0;
+    val[1] = 2.0;
+    val[2] = 3.0;
+    val[3] = 4.0;
+    try arr6.setData(val);
 }
 
 /// Convenience type for a 1-dimensional `NDArray`.

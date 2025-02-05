@@ -1,8 +1,7 @@
 const std = @import("std");
-const mnist = @import("externalResources/mnist.zig");
-const read_file = @import("externalResources/utils.zig").read_file;
-
-const NDArray = @import("pblischak/zig-ndarray/ndarray.zig").NDArray;
+const mnist = @import("albert-yu/mnist/mnist.zig");
+const read_file = @import("albert-yu/mnist/utils.zig").read_file;
+const train = @import("train.zig").train;
 
 pub fn main() !void {
     // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
@@ -64,13 +63,11 @@ pub fn main() !void {
     std.debug.print("made {} train data points.\n", .{train_data_points.len()});
 
     std.debug.print("making test data points...", .{});
-    const test_data = try mnist.make_mnist_data_points_soa(allocator, test_images, image_size, test_labels, DIGITS);
-    defer mnist.free_mnist_data_points_soa(allocator, test_data);
-    std.debug.print("made {} test data points.\n", .{test_data.len()});
+    const test_data_points = try mnist.make_mnist_data_points_soa(allocator, test_images, image_size, test_labels, DIGITS);
+    defer mnist.free_mnist_data_points_soa(allocator, test_data_points);
+    std.debug.print("made {} test data points.\n", .{test_data_points.len()});
 
-    // const HIDDEN_LAYER_SIZE = 30;
-    // const ETA = 0.05;
-    // const EPOCHS = 100;
+    try train(train_data_points); // , test_data_points);
 
     try bw.flush(); // don't forget to flush!
 }

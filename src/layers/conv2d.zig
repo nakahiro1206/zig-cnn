@@ -13,7 +13,7 @@ pub const Conv2DLayer = struct {
         var filters: NDArray(f64, 4) = try NDArray(f64, 4).init(filterShape, allocator);
         var filterBias: NDArray(f64, 1) = try NDArray(f64, 1).init(.{filterShape[0]}, allocator);
 
-        var prng = RndGen.init(0);
+        var prng = RndGen.init(@as(u64, @intCast(std.time.milliTimestamp())));
         const rand = prng.random();
 
         for (0..filterShape[0]) |i| {
@@ -40,31 +40,12 @@ pub const Conv2DLayer = struct {
     pub fn dealloc(self: *Self) void {
         self.filters.deinit();
         self.filterBias.deinit();
-        // self.lastInput.deinit();
     }
 
     pub fn print(self: *Self) void {
         std.debug.print("Conv2DLayer\n", .{});
         std.debug.print("filterShape: {}\n", .{self.filterShape});
         std.debug.print("filters: {}\n", .{self.filters});
-    }
-
-    pub fn iterateRegions(self: *Self, image: NDArray(f64, 2)) void {
-        // Generates all possible filterHeight x filterWidth image regions using valid padding.
-        // - image is a 2d numpy array.
-
-        // 0: outputChannel, 1: inputChannel, 2: filterHeight, 3: filterWidth
-        const filterHeight = self.filterShape[2];
-        const filterWidth = self.filterShape[3];
-        const imageHeight = image.shape[0];
-        const imageWidth = image.shape[1];
-
-        for (0..imageHeight - filterHeight + 1) |i| {
-            for (0..imageWidth - filterWidth + 1) |j| {
-                const region = image.slice(.{ i, j }, .{ filterHeight, filterWidth });
-                self.lastInput = region;
-            }
-        }
     }
 
     pub fn forward(self: *Self, input: NDArray(f64, 4), allocator: std.mem.Allocator) !NDArray(f64, 4) {
@@ -106,6 +87,7 @@ pub const Conv2DLayer = struct {
                             // Clamp the sum to a reasonable range to prevent overflow/underflow
                             if (sum > 1e10) sum = 1e10;
                             if (sum < -1e10) sum = -1e10;
+                            sum += self.filterBias.at(.{outputChannelIdx}); // Add bias term
                             output.setAt(.{ batchIndex, outputChannelIdx, inputH, inputW }, sum);
                         }
                     }
@@ -131,53 +113,122 @@ pub const Conv2DLayer = struct {
         const filterHeight = self.filterShape[2];
         const filterWidth = self.filterShape[3];
 
-        var lossGradientForFilter = try NDArray(f64, 4).init(.{ batchSize, lastInputChannel, lastInputHeight, lastInputWidth }, allocator);
+        var lossGradientForInput = try NDArray(f64, 4).init(.{ batchSize, lastInputChannel, lastInputHeight, lastInputWidth }, allocator);
 
         for (0..batchSize) |batchIdx| {
             for (0..lastInputChannel) |inputChannelIdx| {
-                for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
-                    for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
+                for (0..lastInputHeight) |inputH| {
+                    for (0..lastInputWidth) |inputW| {
                         var sum: f64 = 0.0;
-                        for (0..filterHeight) |filterH| {
-                            for (0..filterWidth) |filterW| {
-                                for (0..outputChannel) |outputChannelIdx| {
-                                    const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
-                                    const inputVal = inputUsedAtForward.atConst(.{ batchIdx, inputChannelIdx, lastInputH + filterH, lastInputW + filterW });
-                                    sum += lossGradVal * inputVal;
+                        for (0..outputChannel) |outputChannelIdx| {
+                            for (0..filterHeight) |filterH| {
+                                for (0..filterWidth) |filterW| {
+                                    if (inputH < filterH or inputW < filterW) {
+                                        continue;
+                                    }
+                                    const h_index = inputH - filterH;
+                                    const w_index = inputW - filterW;
+
+                                    if (h_index < lastInputHeight - filterHeight + 1 and w_index < lastInputWidth - filterWidth + 1) {
+                                        const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, h_index, w_index });
+                                        const filterVal = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW });
+                                        sum += lossGradVal * filterVal;
+                                    }
                                 }
                             }
                         }
-                        // Clamp the sum to a reasonable range to prevent overflow/underflow
-                        if (sum > 1e10) sum = 1e10;
-                        if (sum < -1e10) sum = -1e10;
-                        lossGradientForFilter.setAt(.{ batchIdx, inputChannelIdx, lastInputH, lastInputW }, sum);
+                        lossGradientForInput.setAt(.{ batchIdx, inputChannelIdx, inputH, inputW }, sum);
                     }
                 }
             }
         }
 
+        // var lossGradientForFilter = try NDArray(f64, 4).init(.{ batchSize, lastInputChannel, lastInputHeight, lastInputWidth }, allocator);
+
+        // for (0..batchSize) |batchIdx| {
+        //     for (0..lastInputChannel) |inputChannelIdx| {
+        //         for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
+        //             for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
+        //                 var sum: f64 = 0.0;
+        //                 for (0..filterHeight) |filterH| {
+        //                     for (0..filterWidth) |filterW| {
+        //                         for (0..outputChannel) |outputChannelIdx| {
+        //                             const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
+        //                             const inputVal = inputUsedAtForward.atConst(.{ batchIdx, inputChannelIdx, lastInputH + filterH, lastInputW + filterW });
+        //                             sum += lossGradVal * inputVal;
+        //                         }
+        //                     }
+        //                 }
+        //                 // Clamp the sum to a reasonable range to prevent overflow/underflow
+        //                 if (sum > 1e10) sum = 1e10;
+        //                 if (sum < -1e10) sum = -1e10;
+        //                 lossGradientForFilter.setAt(.{ batchIdx, inputChannelIdx, lastInputH, lastInputW }, sum);
+        //             }
+        //         }
+        //     }
+        // }
+
         // update filters.
+        // for (0..outputChannel) |outputChannelIdx| {
+        //     for (0..lastInputChannel) |inputChannelIdx| {
+        //         for (0..filterHeight) |filterH| {
+        //             for (0..filterWidth) |filterW| {
+        //                 const tmp: f64 = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW });
+        //                 var diff: f64 = 0.0;
+        //                 for (0..batchSize) |batchIdx| {
+        //                     diff += lossGradientForFilter.atConst(.{ batchIdx, inputChannelIdx, filterH, filterW });
+        //                 }
+        //                 var newVal = tmp - diff * learningRate;
+        //                 // Clamp the new value to a reasonable range to prevent overflow/underflow
+        //                 if (newVal > 1e10) newVal = 1e10;
+        //                 if (newVal < -1e10) newVal = -1e10;
+        //                 self.filters.setAt(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }, newVal);
+        //             }
+        //         }
+        //     }
+        // }
         for (0..outputChannel) |outputChannelIdx| {
             for (0..lastInputChannel) |inputChannelIdx| {
                 for (0..filterHeight) |filterH| {
                     for (0..filterWidth) |filterW| {
-                        const tmp: f64 = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW });
-                        var diff: f64 = 0.0;
+                        var filterGradSum: f64 = 0.0;
                         for (0..batchSize) |batchIdx| {
-                            diff += lossGradientForFilter.atConst(.{ batchIdx, inputChannelIdx, filterH, filterW });
+                            // this loop calculates lossGradientForFilter
+                            for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
+                                for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
+                                    const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
+                                    const inputVal = inputUsedAtForward.atConst(.{ batchIdx, inputChannelIdx, lastInputH + filterH, lastInputW + filterW });
+                                    filterGradSum += lossGradVal * inputVal;
+                                }
+                            }
                         }
-                        var newVal = tmp - diff * learningRate;
-                        // Clamp the new value to a reasonable range to prevent overflow/underflow
-                        if (newVal > 1e10) newVal = 1e10;
-                        if (newVal < -1e10) newVal = -1e10;
-                        self.filters.setAt(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }, newVal);
+                        // Apply weight update
+                        var newWeight = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }) - learningRate * filterGradSum / @as(f64, @floatFromInt(batchSize));
+
+                        // Clamp to prevent extreme values
+                        if (newWeight > 1e10) newWeight = 1e10;
+                        if (newWeight < -1e10) newWeight = -1e10;
+
+                        self.filters.setAt(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }, newWeight);
                     }
                 }
             }
         }
 
-        // update filter bias
-        //
-        return lossGradientForFilter;
+        // update filter bias.
+        for (0..outputChannel) |outputChannelIdx| {
+            var biasGradSum: f64 = 0.0;
+            for (0..batchSize) |batchIdx| {
+                for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
+                    for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
+                        biasGradSum += lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
+                    }
+                }
+            }
+            const newBias: f64 = self.filterBias.at(.{outputChannelIdx}) - learningRate * biasGradSum;
+            self.filterBias.setAt(.{outputChannelIdx}, newBias);
+        }
+
+        return lossGradientForInput;
     }
 };

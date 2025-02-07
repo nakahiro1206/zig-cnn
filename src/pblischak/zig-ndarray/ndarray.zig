@@ -297,6 +297,10 @@ pub fn NDArray(comptime T: type, comptime N: usize) type {
             }
             @memcpy(self.items, val);
         }
+
+        pub fn multiplyElementwiseMut(self: *Self, other: NDArray(T, N)) !void {
+            try self.applyFnMut(other, NumericFns(T).multiplyMut);
+        }
     };
 }
 
@@ -339,6 +343,11 @@ test "my impl test" {
     val[2] = 3.0;
     val[3] = 4.0;
     try arr6.setData(val);
+
+    var arr7 = try NDArray(f64, 2).initWithValue(.{ 2, 2 }, 3.0, std.testing.allocator);
+    defer arr7.deinit();
+    try arr7.multiplyElementwiseMut(arr6);
+    try std.testing.expectEqual(arr7.at(.{ 0, 1 }), 6.0);
 }
 
 /// Convenience type for a 1-dimensional `NDArray`.

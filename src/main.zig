@@ -67,7 +67,7 @@ pub fn main() !void {
     defer mnist.free_mnist_data_points_soa(allocator, test_data_points);
     std.debug.print("made {} test data points.\n", .{test_data_points.len()});
 
-    try train(train_data_points); // , test_data_points);
+    try train(train_data_points, test_data_points);
 
     try bw.flush(); // don't forget to flush!
 }

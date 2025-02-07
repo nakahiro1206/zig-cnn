@@ -13,7 +13,7 @@ fn copy_image_data(input: []const u8, output: []f64) void {
     for (input, 0..) |pixel, i| {
         const x_val = @as(f64, @floatFromInt(pixel));
         // normalize
-        output[i] = x_val / 255;
+        output[i] = x_val / 255.0 - 0.5;
     }
 }
 

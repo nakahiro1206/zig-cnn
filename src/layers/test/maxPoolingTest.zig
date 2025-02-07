@@ -1,7 +1,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
-const MaxPoolingLayer = @import("maxPooling.zig").MaxPoolingLayer;
-const NDArray = @import("../pblischak/zig-ndarray/ndarray.zig").NDArray;
+const MaxPoolingLayer = @import("../maxPooling.zig").MaxPoolingLayer;
+const NDArray = @import("../../pblischak/zig-ndarray/ndarray.zig").NDArray;
 
 fn isSameShape(N: comptime_int, in: [N]usize, out: [N]usize) bool {
     for (0..N) |i| {

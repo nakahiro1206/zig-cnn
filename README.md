@@ -1,7 +1,8 @@
-https://github.com/albert-yu/mnist
-https://qiita.com/oirom/items/22ccb7c0139dce925f43
-ChatGPT idea: https://chatgpt.com/c/67930f32-4be8-800d-8909-2d9cd0ce1b66
-kmnist benchmark: https://github.com/rois-codh/kmnist/blob/master/benchmarks/kuzushiji_mnist_cnn.py
-keras: https://github.com/keras-team/keras/tree/master/keras/src
+## Zig CNN
 
-cnn-from-scratch: https://github.com/vzhou842/cnn-from-scratch/tree/master
+**Note: this project is developed for assignment and my study, it's not so useful for real-life implementation!!**
+
+### Referred Repository
+- [pblischak/zig-ndarray](https://github.com/pblischak/zig-ndarray)
+- [albert-yu/mnist](https://github.com/albert-yu/mnist)
+- [vzhou842/cnn-from-scratch](https://github.com/vzhou842/cnn-from-scratch)

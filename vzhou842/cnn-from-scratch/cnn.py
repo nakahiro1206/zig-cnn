@@ -16,10 +16,10 @@ def load(f):
     return np.load(f)['arr_0']
 
 # Load the data
-train_images = load('../../data/kmnist-train-imgs.npz')
-test_images = load('../../data/kmnist-test-imgs.npz')
-train_labels = load('../../data/kmnist-train-labels.npz')
-test_labels = load('../../data/kmnist-test-labels.npz')
+train_images = load('../../rois-codh/kmnist/kmnist-train-imgs.npz')
+test_images = load('../../rois-codh/kmnist/kmnist-test-imgs.npz')
+train_labels = load('../../rois-codh/kmnist/kmnist-train-labels.npz')
+test_labels = load('../../rois-codh/kmnist/kmnist-test-labels.npz')
 
 conv = Conv3x3(8)                  # 28x28x1 -> 26x26x8
 pool = MaxPool2()                  # 26x26x8 -> 13x13x8

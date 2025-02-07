@@ -17,7 +17,7 @@ pub fn main() !void {
     try stdout.print("Run `zig build test` to run the tests.\n", .{});
 
     // load MNIST dataset.
-    const TRAIN_LABELS_FILE = "data/train-labels-idx1-ubyte";
+    const TRAIN_LABELS_FILE = "rois-codh/kmnist/train-labels-idx1-ubyte";
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const status = gpa.deinit();
@@ -34,7 +34,7 @@ pub fn main() !void {
     const labels = train_labels_buffer[start_index..];
 
     // read training images
-    const TRAIN_IMAGES_FILE = "data/train-images-idx3-ubyte";
+    const TRAIN_IMAGES_FILE = "rois-codh/kmnist/train-images-idx3-ubyte";
     const train_images_buffer = try read_file(allocator, TRAIN_IMAGES_FILE);
     defer allocator.free(train_images_buffer);
 
@@ -43,13 +43,13 @@ pub fn main() !void {
     const images = train_images_buffer[img_start_offset..];
 
     // read test images
-    const TEST_IMAGES_FILE = "data/t10k-images-idx3-ubyte";
+    const TEST_IMAGES_FILE = "rois-codh/kmnist/t10k-images-idx3-ubyte";
     const test_images_buffer = try read_file(allocator, TEST_IMAGES_FILE);
     defer allocator.free(test_images_buffer);
     const test_images = test_images_buffer[img_start_offset..];
 
     // read test labels
-    const TEST_LABELS_FILE = "data/t10k-labels-idx1-ubyte";
+    const TEST_LABELS_FILE = "rois-codh/kmnist/t10k-labels-idx1-ubyte";
     const test_labels_buffer = try read_file(allocator, TEST_LABELS_FILE);
     defer allocator.free(test_labels_buffer);
     const test_labels = test_labels_buffer[start_index..];

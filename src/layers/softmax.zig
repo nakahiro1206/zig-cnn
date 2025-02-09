@@ -45,29 +45,6 @@ pub const Softmax = struct {
         const batchSize = input.shape[0];
         var softmax = try NDArray(f64, 2).initWithValue(.{ batchSize, self.outputChannel }, 0.0, allocator);
 
-        // // Z = XW + B
-        // var totalPerBatch = try NDArray(f64, 1).initWithValue(.{batchSize}, 0.0, allocator);
-        // defer totalPerBatch.deinit();
-        // for (0..batchSize) |batchIdx| {
-        //     var sumTotal: f64 = 0.0;
-        //     for (0..self.outputChannel) |outputIndex| {
-        //         var sum: f64 = 0.0;
-        //         for (0..self.inputChannel) |inputChannelIndex| {
-        //             sum += input.atConst(.{ batchIdx, inputChannelIndex }) * self.weights.at(.{ inputChannelIndex, outputIndex });
-        //         }
-        //         sum += self.bias.at(.{outputIndex});
-        //         softmax.setAt(.{ batchIdx, outputIndex }, sum);
-        //         sumTotal += sum;
-        //     }
-        //     totalPerBatch.setAt(.{batchIdx}, sumTotal);
-        // }
-
-        // for (0..batchSize) |batchIdx| {
-        //     for (0..self.outputChannel) |outputIndex| {
-        //         softmax.setAt(.{ batchIdx, outputIndex }, @exp(softmax.at(.{ batchIdx, outputIndex }) - totalPerBatch.at(.{batchIdx})));
-        //     }
-        // }
-
         // Step 1: Compute Z = XW + B
         var maxPerBatch = try NDArray(f64, 1).initWithValue(.{batchSize}, -std.math.inf(f64), allocator);
         defer maxPerBatch.deinit();

@@ -116,7 +116,7 @@ pub const Conv2DLayer = struct {
         const H_F = self.filterShape[2];
         const W_F = self.filterShape[3];
 
-        const dL_dX = try NDArray(f64, 4).init(.{ B, C_X, H_X, W_X }, allocator);
+        var dL_dX = try NDArray(f64, 4).init(.{ B, C_X, H_X, W_X }, allocator);
 
         for (0..B) |b| {
             for (0..C_X) |c_X| {

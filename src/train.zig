@@ -57,6 +57,7 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
         try trainDataPoints.shuffle(allocator);
         stopwatch.report("shuffle");
         var totalTrainAcc: f64 = 0.0;
+        var totalTrainLoss: f64 = 0.0;
 
         for (0..batchCount) |batchIndex| {
             const start: usize = batchIndex * batchSize;
@@ -84,6 +85,7 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
             // evaluation
             const res = try eval(f4, groundTruth, allocator, true);
             totalTrainAcc += res.acc;
+            totalTrainLoss += res.loss;
             var gradient = res.gradient;
             defer gradient.deinit();
 
@@ -99,6 +101,7 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
         }
 
         std.debug.print("Cumulative acc: {d}\n", .{totalTrainAcc / 60000.0});
+        std.debug.print("Average loss: {d}\n", .{totalTrainLoss / 60000.0});
         stopwatch.report("trained");
         std.debug.print("evaluating...", .{});
 

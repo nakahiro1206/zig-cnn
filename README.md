@@ -12,7 +12,7 @@ Uniformed condition: epochs = 1, batch size = 1, learning rate = 0.005.
 | ----- | --------------| ------------------|-----------------|---------------------|---------------|
 |CNN from scratch(numpy only) | 0.433  | 0.87 | 0.785 | 0.768 | 1139 |
 |CNN from scratch(keras)      | 0.6455 | 0.8018 | 0.6837 | 0.7977 | 19 |
-|My model                     | ..     | 0.7329 | 1.659 | 0.674 | 196 |
+|My model                     | 1.714  | 0.7301 | 1.714 | 0.675 | 288 |
 
 ### Referred Repository
 - [pblischak/zig-ndarray](https://github.com/pblischak/zig-ndarray)

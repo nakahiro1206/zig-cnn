@@ -1,16 +1,18 @@
 ## Zig CNN
 
+Naive CNN model implemented in Zig.
 
-196.07 sec | index range: 59994..59995 / 60000 | loss:  0.023, acc:  1.000
-196.07 sec | index range: 59995..59996 / 60000 | loss:  0.303, acc:  1.000
-196.07 sec | index range: 59996..59997 / 60000 | loss:  0.001, acc:  1.000
-196.08 sec | index range: 59997..59998 / 60000 | loss:  0.004, acc:  1.000
-196.08 sec | index range: 59998..59999 / 60000 | loss:  0.004, acc:  1.000
-196.08 sec | index range: 59999..60000 / 60000 | loss:  0.000, acc:  1.000
-Cumulative acc: 0.7328666666666667
-elapsed: 195650433000ns (trained)
-evaluating...Done. loss:  1.659, acc:  0.674
+### Performance for [KMIST](https://github.com/rois-codh/kmnist)
 
+I referred to the code of [CNN from scratch](https://github.com/vzhou842/cnn-from-scratch) for constructing the model, and I compared the performance and accuracy with his model and another model he implemented as a benchmark.
+
+Uniformed condition: epochs = 1, batch size = 1, learning rate = 0.005.
+
+|Model| Training Loss | Training Accuracy | Evaluation Loss | Evaluation Accuracy | Training Time (sec) |
+| ----- | --------------| ------------------|-----------------|---------------------|---------------|
+|CNN from scratch(numpy only) | 0.433  | 0.87 | 0.785 | 0.768 | 1139 |
+|CNN from scratch(keras)      | 0.6455 | 0.8018 | 0.6837 | 0.7977 | 19 |
+|My model                     | ..     | 0.7329 | 1.659 | 0.674 | 196 |
 
 ### Referred Repository
 - [pblischak/zig-ndarray](https://github.com/pblischak/zig-ndarray)

@@ -48,8 +48,8 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
     var groundTruth = try NDArray(f64, 2).initWithValue(.{ batchSize, outputSize }, 0.0, allocator);
     defer groundTruth.deinit();
 
-    // var buf1: [5]u8 = undefined;
-    // var buf2: [5]u8 = undefined;
+    var buf1: [5]u8 = undefined;
+    var buf2: [5]u8 = undefined;
 
     for (0..epochs) |epochIndex| {
         std.debug.print("training epoch {} of {}\n", .{ epochIndex + 1, epochs });
@@ -60,11 +60,11 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
 
         for (0..batchCount) |batchIndex| {
             const start: usize = batchIndex * batchSize;
-            // const end: usize = start + batchSize;
-            // const str1 = try std.fmt.bufPrint(&buf1, "{d}", .{start});
-            // const str2 = try std.fmt.bufPrint(&buf2, "{d}", .{end});
-            // try stopwatch.reportForHeadding();
-            // std.debug.print("index range: {s: >5}..{s: >5} / {} | ", .{ str1, str2, totalDataPoints });
+            const end: usize = start + batchSize;
+            const str1 = try std.fmt.bufPrint(&buf1, "{d}", .{start});
+            const str2 = try std.fmt.bufPrint(&buf2, "{d}", .{end});
+            try stopwatch.reportForHeadding();
+            std.debug.print("index range: {s: >5}..{s: >5} / {} | ", .{ str1, str2, totalDataPoints });
 
             const x_data = trainDataPoints.slice_x(start, batchSize);
             try trainData.setData(x_data);
@@ -82,7 +82,7 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
             defer f4.deinit();
 
             // evaluation
-            const res = try eval(f4, groundTruth, allocator, false);
+            const res = try eval(f4, groundTruth, allocator, true);
             totalTrainAcc += res.acc;
             var gradient = res.gradient;
             defer gradient.deinit();
@@ -98,7 +98,7 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
             defer g4.deinit();
         }
 
-        std.debug.print("acc: {d}\n", .{totalTrainAcc / 60000.0});
+        std.debug.print("Cumulative acc: {d}\n", .{totalTrainAcc / 60000.0});
         stopwatch.report("trained");
         std.debug.print("evaluating...", .{});
 
@@ -144,108 +144,10 @@ pub fn train(trainDataPoints: DataPointSOA, testDataPoints: DataPointSOA) !void 
         totalAcc /= @as(f64, @floatFromInt(testBatchCount));
         totalLoss /= @as(f64, @floatFromInt(testBatchCount));
 
-        std.debug.print("done. loss: {:.4}, acc: {:.4}\n", .{ totalLoss, totalAcc });
+        var out1: [6]u8 = undefined;
+        var out2: [6]u8 = undefined;
+        const str1 = try std.fmt.bufPrint(&out1, "{d:.3}", .{totalLoss});
+        const str2 = try std.fmt.bufPrint(&out2, "{d:.3}", .{totalAcc});
+        std.debug.print("Done. loss: {s: >6}, acc: {s: >6}\n", .{ str1, str2 });
     }
 }
-
-//     const HIDDEN_LAYER_SIZE = 30;
-//     const ETA = 0.05;
-//     const EPOCHS = 100;
-
-//     var layer1 = try layers.Layer(image_size, HIDDEN_LAYER_SIZE).alloc(allocator);
-//     defer layer1.dealloc(allocator);
-//     var layer2 = try layers.Layer(HIDDEN_LAYER_SIZE, DIGITS).alloc(allocator);
-//     defer layer2.dealloc(allocator);
-
-//     layer1.init_randn();
-//     layer2.init_randn();
-
-//     const BATCH_SIZE = 10;
-
-//     const batch_count = train_data_points.len() / BATCH_SIZE;
-
-//     var stopwatch = perf.Stopwatch.new();
-//     var epoch_index: usize = 0;
-//     while (epoch_index < EPOCHS) : (epoch_index += 1) {
-//         std.debug.print("training epoch {} of {}\n", .{ epoch_index + 1, EPOCHS });
-//         stopwatch.start();
-//         try train_data_points.shuffle(allocator);
-//         stopwatch.report("shuffle");
-//         var batch_index: usize = 0;
-//         const scalar: comptime_float = ETA / @as(f64, @floatFromInt(BATCH_SIZE));
-
-//         var x = linalg.Matrix.new(image_size, 1);
-//         try x.alloc(allocator);
-//         defer x.dealloc(allocator);
-//         var y = linalg.Matrix.new(DIGITS, 1);
-//         try y.alloc(allocator);
-//         defer y.dealloc(allocator);
-
-//         var err = linalg.Matrix.new(DIGITS, 1);
-//         try err.alloc(allocator);
-//         defer err.dealloc(allocator);
-
-//         while (batch_index < batch_count) : (batch_index += 1) {
-//             var i = batch_index * BATCH_SIZE;
-//             const end = i + BATCH_SIZE;
-
-//             while (i < end) : (i += 1) {
-//                 const x_data = train_data_points.x_at(i);
-//                 // console_print_image(x_data, 28);
-//                 x.set_data(x_data);
-//                 const y_data = train_data_points.y_at(i);
-//                 y.set_data(y_data);
-
-//                 // forward
-//                 const activations1 = try layer1.forward(allocator, x, maths.sigmoid);
-//                 const activations2 = try layer2.forward(allocator, activations1, maths.sigmoid);
-//                 activations2.sub(y, &err);
-
-//                 // backward
-//                 var grad2 = try layer2.backward(allocator, err, maths.sigmoid_prime);
-
-//                 var err_inner = try layer2.weights.t_alloc(allocator);
-//                 defer err_inner.dealloc(allocator);
-
-//                 var err_inner2 = try err_inner.mul_alloc(allocator, grad2.biases);
-//                 defer err_inner2.dealloc(allocator);
-//                 var grad1 = try layer1.backward(allocator, err_inner2, maths.sigmoid_prime);
-
-//                 // apply gradients
-//                 grad1.biases.scale(scalar);
-//                 layer1.biases.sub(grad1.biases, &layer1.biases);
-//                 grad1.weights.scale(scalar);
-//                 layer1.weights.sub(grad1.weights, &layer1.weights);
-
-//                 grad2.biases.scale(scalar);
-//                 layer2.biases.sub(grad2.biases, &layer2.biases);
-//                 grad2.weights.scale(scalar);
-//                 layer2.weights.sub(grad2.weights, &layer2.weights);
-//             }
-//         }
-//         stopwatch.report("trained");
-//         std.debug.print("evaluating...", .{});
-
-//         var i: usize = 0;
-//         var correct: usize = 0;
-//         while (i < test_data.len()) : (i += 1) {
-//             const x_data = test_data.x_at(i);
-//             x.set_data(x_data);
-//             const y_data = test_data.y_at(i);
-
-//             const activations1 = try layer1.forward(allocator, x, maths.sigmoid);
-//             const activations2 = try layer2.forward(allocator, activations1, maths.sigmoid);
-
-//             const expected = find_max_index(y_data);
-//             const result_data = try activations2.dump(allocator);
-//             defer allocator.free(result_data);
-//             const actual = find_max_index(result_data);
-//             if (expected == actual) {
-//                 correct += 1;
-//             }
-//         }
-//         std.debug.print("done. {}/{} correct\n", .{ correct, test_data.len() });
-//     }
-
-//     std.debug.print("done.\n", .{});
-// }

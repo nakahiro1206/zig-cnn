@@ -98,137 +98,96 @@ pub const Conv2DLayer = struct {
         return output;
     }
 
-    pub fn backPropagation(self: *Self, lossGradientForOutput: NDArray(f64, 4), inputUsedAtForward: NDArray(f64, 4), learningRate: f64, allocator: std.mem.Allocator) !NDArray(f64, 4) {
+    pub fn backPropagation(self: *Self, dL_dZ: NDArray(f64, 4), X: NDArray(f64, 4), learningRate: f64, allocator: std.mem.Allocator) !NDArray(f64, 4) {
         // Performs a backward pass of the conv layer.
         // - d_L_d_out is the loss gradient for this layer's outputs. size: (filter_num, 28 - 2, 28 - 2`)
         // - learn_rate is a float.
 
-        const batchSize = inputUsedAtForward.shape[0];
-        const lastInputChannel = inputUsedAtForward.shape[1];
-        const lastInputHeight = inputUsedAtForward.shape[2];
-        const lastInputWidth = inputUsedAtForward.shape[3];
+        const B = X.shape[0];
+        const C_X = X.shape[1];
+        const H_X = X.shape[2];
+        const W_X = X.shape[3];
 
         // const inputChannel = self.filterShape[1]; == lastInputChannel
-        const outputChannel = self.filterShape[0];
-        const filterHeight = self.filterShape[2];
-        const filterWidth = self.filterShape[3];
+        const C_Z = dL_dZ.shape[1];
+        const H_Z = self.filterShape[2];
+        const W_Z = self.filterShape[3];
 
-        var lossGradientForInput = try NDArray(f64, 4).init(.{ batchSize, lastInputChannel, lastInputHeight, lastInputWidth }, allocator);
+        const H_F = self.filterShape[2];
+        const W_F = self.filterShape[3];
 
-        for (0..batchSize) |batchIdx| {
-            for (0..lastInputChannel) |inputChannelIdx| {
-                for (0..lastInputHeight) |inputH| {
-                    for (0..lastInputWidth) |inputW| {
+        const dL_dX = try NDArray(f64, 4).init(.{ B, C_X, H_X, W_X }, allocator);
+
+        for (0..B) |b| {
+            for (0..C_X) |c_X| {
+                for (0..H_X) |h_X| {
+                    for (0..W_X) |w_X| {
                         var sum: f64 = 0.0;
-                        for (0..outputChannel) |outputChannelIdx| {
-                            for (0..filterHeight) |filterH| {
-                                for (0..filterWidth) |filterW| {
-                                    if (inputH < filterH or inputW < filterW) {
+                        for (0..C_Z) |c_Z| {
+                            for (0..H_F) |h| {
+                                for (0..W_F) |w| {
+                                    if (h_X < h or w_X < w) {
                                         continue;
                                     }
-                                    const h_index = inputH - filterH;
-                                    const w_index = inputW - filterW;
+                                    const h_index = h_X - h;
+                                    const w_index = w_X - w;
 
-                                    if (h_index < lastInputHeight - filterHeight + 1 and w_index < lastInputWidth - filterWidth + 1) {
-                                        const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, h_index, w_index });
-                                        const filterVal = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW });
+                                    if (h_index < H_X - H_F + 1 and w_index < W_X - W_F + 1) {
+                                        const lossGradVal = dL_dZ.atConst(.{ b, c_Z, h_index, w_index });
+                                        const filterVal = self.filters.at(.{ c_Z, c_X, h, w });
                                         sum += lossGradVal * filterVal;
                                     }
                                 }
                             }
                         }
-                        lossGradientForInput.setAt(.{ batchIdx, inputChannelIdx, inputH, inputW }, sum);
+                        dL_dX.setAt(.{ b, c_X, h_X, w_X }, sum);
                     }
                 }
             }
         }
 
-        // var lossGradientForFilter = try NDArray(f64, 4).init(.{ batchSize, lastInputChannel, lastInputHeight, lastInputWidth }, allocator);
-
-        // for (0..batchSize) |batchIdx| {
-        //     for (0..lastInputChannel) |inputChannelIdx| {
-        //         for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
-        //             for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
-        //                 var sum: f64 = 0.0;
-        //                 for (0..filterHeight) |filterH| {
-        //                     for (0..filterWidth) |filterW| {
-        //                         for (0..outputChannel) |outputChannelIdx| {
-        //                             const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
-        //                             const inputVal = inputUsedAtForward.atConst(.{ batchIdx, inputChannelIdx, lastInputH + filterH, lastInputW + filterW });
-        //                             sum += lossGradVal * inputVal;
-        //                         }
-        //                     }
-        //                 }
-        //                 // Clamp the sum to a reasonable range to prevent overflow/underflow
-        //                 if (sum > 1e10) sum = 1e10;
-        //                 if (sum < -1e10) sum = -1e10;
-        //                 lossGradientForFilter.setAt(.{ batchIdx, inputChannelIdx, lastInputH, lastInputW }, sum);
-        //             }
-        //         }
-        //     }
-        // }
-
         // update filters.
-        // for (0..outputChannel) |outputChannelIdx| {
-        //     for (0..lastInputChannel) |inputChannelIdx| {
-        //         for (0..filterHeight) |filterH| {
-        //             for (0..filterWidth) |filterW| {
-        //                 const tmp: f64 = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW });
-        //                 var diff: f64 = 0.0;
-        //                 for (0..batchSize) |batchIdx| {
-        //                     diff += lossGradientForFilter.atConst(.{ batchIdx, inputChannelIdx, filterH, filterW });
-        //                 }
-        //                 var newVal = tmp - diff * learningRate;
-        //                 // Clamp the new value to a reasonable range to prevent overflow/underflow
-        //                 if (newVal > 1e10) newVal = 1e10;
-        //                 if (newVal < -1e10) newVal = -1e10;
-        //                 self.filters.setAt(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }, newVal);
-        //             }
-        //         }
-        //     }
-        // }
-        for (0..outputChannel) |outputChannelIdx| {
-            for (0..lastInputChannel) |inputChannelIdx| {
-                for (0..filterHeight) |filterH| {
-                    for (0..filterWidth) |filterW| {
+        for (0..C_Z) |c_Z| {
+            for (0..C_X) |c_X| {
+                for (0..H_F) |h_F| {
+                    for (0..W_F) |w_F| {
                         var filterGradSum: f64 = 0.0;
-                        for (0..batchSize) |batchIdx| {
-                            // this loop calculates lossGradientForFilter
-                            for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
-                                for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
-                                    const lossGradVal = lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
-                                    const inputVal = inputUsedAtForward.atConst(.{ batchIdx, inputChannelIdx, lastInputH + filterH, lastInputW + filterW });
+                        // dL_dW = sum_{b, h, w} dL_dZ[b, c_F, h, w] * X[b, c_X, h + h_F, w + w_F]
+                        for (0..B) |b| {
+                            for (0..H_Z) |h_Z| {
+                                for (0..W_Z) |w_Z| {
+                                    const lossGradVal = dL_dZ.atConst(.{ b, c_Z, h_Z, w_Z });
+                                    const inputVal = X.atConst(.{ b, c_X, h_Z + h_F, w_Z + w_F });
                                     filterGradSum += lossGradVal * inputVal;
                                 }
                             }
                         }
                         // Apply weight update
-                        var newWeight = self.filters.at(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }) - learningRate * filterGradSum / @as(f64, @floatFromInt(batchSize));
-
-                        // Clamp to prevent extreme values
-                        if (newWeight > 1e10) newWeight = 1e10;
-                        if (newWeight < -1e10) newWeight = -1e10;
-
-                        self.filters.setAt(.{ outputChannelIdx, inputChannelIdx, filterH, filterW }, newWeight);
+                        // newW = W - learningRate * dL_dW
+                        const newWeight = self.filters.at(.{ c_Z, c_X, h_F, w_F }) - learningRate * filterGradSum / @as(f64, @floatFromInt(B));
+                        self.filters.setAt(.{ c_Z, c_X, h_F, w_F }, newWeight);
                     }
                 }
             }
         }
 
-        // update filter bias.
-        for (0..outputChannel) |outputChannelIdx| {
+        // calculate update diff and update filter bias.
+        for (0..C_Z) |c_Z| {
             var biasGradSum: f64 = 0.0;
-            for (0..batchSize) |batchIdx| {
-                for (0..lastInputHeight - filterHeight + 1) |lastInputH| {
-                    for (0..lastInputWidth - filterWidth + 1) |lastInputW| {
-                        biasGradSum += lossGradientForOutput.atConst(.{ batchIdx, outputChannelIdx, lastInputH, lastInputW });
+            // biasGradSum = sum_{b, h, w} dL_dZ[b, c_F, h, w]
+            for (0..B) |b| {
+                for (0..H_X - H_F + 1) |h_Z| {
+                    for (0..W_X - W_F + 1) |w_Z| {
+                        biasGradSum += dL_dZ.atConst(.{ b, c_Z, h_Z, w_Z });
                     }
                 }
             }
-            const newBias: f64 = self.filterBias.at(.{outputChannelIdx}) - learningRate * biasGradSum;
-            self.filterBias.setAt(.{outputChannelIdx}, newBias);
+            // newB = B - learningRate * dL_dB
+            // normalize by batch size
+            const newBias: f64 = self.filterBias.at(.{c_Z}) - learningRate * biasGradSum / @as(f64, @floatFromInt(B));
+            self.filterBias.setAt(.{c_Z}, newBias);
         }
 
-        return lossGradientForInput;
+        return dL_dX;
     }
 };

@@ -7,12 +7,14 @@ pub const EvalResponse = struct {
     gradient: NDArray(f64, 2),
 };
 
-pub fn eval(prediction: NDArray(f64, 2), groundTruth: NDArray(f64, 2), allocator: std.mem.Allocator, logging: bool) !EvalResponse {
+// calculate softmax cross entropy loss and accuracy
+// also returns gradint.
+pub fn eval(prediction: NDArray(f64, 2), groundTruth: NDArray(f64, 2), allocator: std.mem.Allocator, verbose: bool) !EvalResponse {
     // prediction: [batchSize, outputSize]
     const outputSize = prediction.shape[1];
     const batchSize = prediction.shape[0];
 
-    var gradient = try NDArray(f64, 2).initWithValue(.{ batchSize, outputSize }, 0.0, allocator);
+    var gradient = try NDArray(f64, 2).fromCopiedSlice(.{ batchSize, outputSize }, prediction.items, allocator);
 
     var lossTotal: f64 = 0.0;
     var accTotal: f64 = 0.0;
@@ -35,10 +37,10 @@ pub fn eval(prediction: NDArray(f64, 2), groundTruth: NDArray(f64, 2), allocator
             accTotal += 1.0;
         }
 
-        gradient.setAt(.{ batchIndex, answerIndex }, -1 / (prediction.atConst(.{ batchIndex, answerIndex }) + epsilon));
+        gradient.setAt(.{ batchIndex, answerIndex }, gradient.at(.{ batchIndex, answerIndex }) - 1.0);
     }
 
-    if (logging) {
+    if (verbose) {
         var buf1: [6]u8 = undefined;
         var buf2: [6]u8 = undefined;
         const str1 = try std.fmt.bufPrint(&buf1, "{d:.3}", .{lossTotal / batchSizef64});
